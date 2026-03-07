@@ -2,34 +2,51 @@
 
 > A minimal Midnight app that demonstrates privacy-preserving access control. Users prove eligibility for protected access without revealing unnecessary personal information.
 
-Built on [Midnight Network](https://midnight.network) using Compact smart contracts and zero-knowledge proofs.
+Built on [Midnight Network](https://midnight.network) using Compact smart contracts and zero-knowledge proofs. Aligned with the [Midnight Agent Skills](https://github.com/mzf11125/midnight_agent_skills) knowledge base for consistent Midnight-native patterns.
 
 ---
 
 ## What It Does
 
-zkPass Lite is a private eligibility checker. A user connects a wallet, submits a proof for one binary claim (eligible / not eligible), and receives an access decision. The eligibility token **never touches the blockchain** — only the result is recorded.
+zkPass Lite is a private eligibility checker. A user connects a wallet, submits a proof for one binary claim (eligible / not eligible), and receives an access decision — all without exposing their private eligibility token.
+
+### Architecture: Kachina Dual-State Model
+
+Midnight uses the [Kachina protocol](https://docs.midnight.network/) for smart contracts. Every contract operates on two layers of state:
+
+| Layer | Where | Visible? | Example in zkPass |
+| --- | --- | --- | --- |
+| **Public state** (ledger) | On-chain | Yes | `accessCount`, `lastStatus`, `eligibleCommitments` |
+| **Private state** (witness) | User's device | No | User's raw eligibility token |
+
+A **zero-knowledge proof** bridges the two: it proves a computation over private data (the witness) was performed correctly, without revealing that data. This is Midnight's core innovation — **selective disclosure**.
 
 ### Privacy Model
 
-| What                    | Where             | Visible to Others? |
-| ----------------------- | ----------------- | ------------------ |
-| Eligibility token       | User's device     | ❌ Never            |
-| ZK proof of computation | Midnight network  | ✅ (opaque proof)   |
-| Access result           | Blockchain ledger | ✅ ("access-granted") |
-| Access count            | Blockchain ledger | ✅ (number)          |
+| What | Where | On-chain? |
+| --- | --- | --- |
+| Raw eligibility token | User's device (witness) | Never |
+| Token hash (commitment) | Disclosed inside ZK circuit | Yes (for set membership check) |
+| Access result | Ledger (`lastStatus`) | Yes |
+| Access count | Ledger (`accessCount`) | Yes |
+
+### How the ZK Flow Works
+
+1. **Witness** provides the raw token locally (never leaves the user's machine)
+2. **Circuit** hashes the token with `persistent_hash()` to produce a commitment
+3. **Circuit** discloses the commitment and checks it against the on-chain `Set<Bytes<32>>`
+4. **`assert()`** verifies membership — if it fails, no proof is generated, no transaction submitted
+5. **Result** ("access-granted") and counter increment are the only on-chain changes
 
 ---
 
 ## Prerequisites
 
-Before you start, make sure you have:
-
-| Requirement         | Version | How to Get It                                                            |
-| ------------------- | ------- | ------------------------------------------------------------------------ |
-| **Node.js**         | 22+     | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org) |
-| **Docker**          | Latest  | [docker.com](https://www.docker.com/products/docker-desktop/)            |
-| **Compact Compiler** | 0.23+  | [Midnight installation guide](https://docs.midnight.network/getting-started/installation) |
+| Requirement | Version | How to Get It |
+| --- | --- | --- |
+| **Node.js** | 22+ | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org) |
+| **Docker** | Latest | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| **Compact Compiler** | 0.19+ | [Midnight installation guide](https://docs.midnight.network/getting-started/installation) |
 
 Optional for the web frontend:
 - [Midnight Lace wallet](https://docs.midnight.network/guides/lace-wallet) browser extension
@@ -38,7 +55,7 @@ Optional for the web frontend:
 
 ## Quick Start
 
-### 1. Clone and install
+### 1. Install dependencies
 
 ```bash
 cd zkpass-lite
@@ -47,13 +64,11 @@ npm install
 
 ### 2. Start the proof server
 
-The proof server runs in Docker and generates zero-knowledge proofs for transactions.
-
 ```bash
 npm run proof-server:start
 ```
 
-> This starts a Docker container on port 6300. Keep it running.
+> Runs in Docker on port 6300. Keep it running.
 
 ### 3. Compile the contract
 
@@ -61,9 +76,10 @@ npm run proof-server:start
 npm run compile
 ```
 
-You should see:
+Expected output:
 ```
-Compiling 1 circuits:
+Compiling circuits:
+  circuit "addEligible" (k=..., rows=...)
   circuit "checkAccess" (k=..., rows=...)
 ```
 
@@ -74,28 +90,32 @@ npm run deploy
 ```
 
 The script will:
-1. Create a new wallet (or restore from seed)
-2. Show your wallet address — fund it at [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/)
-3. Wait for DUST tokens (gas) to generate
-4. Deploy the contract to Midnight Preprod
+1. Create or restore a wallet
+2. Show your address — fund it at [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/)
+3. Register for DUST (Midnight's gas token, generated from tNight over time)
+4. Deploy the contract
 5. Save the contract address to `deployment.json`
 
-> **Save your wallet seed!** You'll need it to interact with the contract later.
+> **Save your wallet seed!** You need it for all future interactions.
 
-### 5. Interact via CLI
+### 5. Seed the eligible set (admin)
 
 ```bash
 npm run cli
 ```
 
-Enter your wallet seed and choose from the menu:
-- **[1] Check private access** — provide an eligibility token and submit a ZK proof
-- **[2] Read access count** — view public state from the blockchain
-- **[3] Exit**
+Choose option **[3] Seed eligible set with demo tokens**. This calls the `addEligible` circuit for each demo token, adding their hashed commitments to the on-chain `Set<Bytes<32>>`.
 
-Valid demo tokens: `midnight-pioneer`, `zkpass-member-001`, `fellowship-2024`, `demo-eligible`
+### 6. Check access (user)
 
-### 6. Run the frontend (optional)
+In the same CLI, choose option **[1] Check private access** and enter a token:
+
+- Valid tokens: `midnight-pioneer`, `zkpass-member-001`, `fellowship-2024`, `demo-eligible`
+- Invalid token: anything else
+
+The witness provides the token privately. The circuit hashes it and checks the hash against the on-chain set. If valid → "Access granted". If invalid → proof generation fails → "Access denied".
+
+### 7. Run the frontend (optional)
 
 ```bash
 cd frontend
@@ -103,7 +123,44 @@ npm install
 npm run dev
 ```
 
-Opens at `http://localhost:3000`. If the Midnight Lace wallet is not installed, the app automatically enters **Demo Mode**.
+Opens at `http://localhost:3000`. Auto-enters Demo Mode if the Lace wallet is not installed.
+
+---
+
+## Contract Explained
+
+**File**: `contracts/zkpass.compact`
+**Language**: Compact (v0.19+) — Midnight's purpose-built language for ZK smart contracts
+
+### Public Ledger State
+
+```compact
+export ledger accessCount: Counter;                    // successful check count
+export ledger lastStatus: Opaque<"string">;            // latest result message
+export ledger eligibleCommitments: Set<Bytes<32>>;     // hashed eligible tokens
+```
+
+All three are visible on-chain. The `Set` stores **hashed commitments**, not raw tokens.
+
+### Witness Function (Private)
+
+```compact
+witness local_eligibility_token(): Bytes<32>;
+```
+
+Executes locally on the user's device during proof generation. Returns the raw eligibility token. **This value never leaves the user's machine or appears in any transaction.**
+
+### Circuits
+
+**`addEligible(commitment: Bytes<32>)`** — Admin adds a hashed commitment to the eligible set.
+
+**`checkAccess()`** — User proves eligibility:
+1. Calls `local_eligibility_token()` witness to get private token
+2. Computes `persistent_hash(token)` inside the circuit
+3. Discloses the hash and asserts it exists in `eligibleCommitments`
+4. Records "access-granted" on the ledger
+
+If the assertion fails, **no ZK proof is generated and no transaction is submitted**.
 
 ---
 
@@ -112,23 +169,23 @@ Opens at `http://localhost:3000`. If the Midnight Lace wallet is not installed, 
 ```
 zkpass-lite/
 ├── contracts/
-│   └── zkpass.compact              # Compact smart contract
+│   └── zkpass.compact              # Compact smart contract (witness + Set + assert)
 ├── src/
 │   ├── deploy.ts                   # Deploy to Preprod
-│   ├── cli.ts                      # CLI interaction
-│   ├── utils.ts                    # Wallet + provider utilities
+│   ├── cli.ts                      # CLI interaction (seed + check + read)
+│   ├── utils.ts                    # Wallet, providers, witness impl, commitment hash
 │   └── check-balance.ts            # Balance checker
 ├── frontend/
-│   ├── index.html
 │   ├── src/
-│   │   ├── App.tsx                 # React UI
+│   │   ├── App.tsx                 # React UI with Kachina model explanation
 │   │   ├── App.css                 # Styles
 │   │   ├── main.tsx                # Entry point
 │   │   └── types.ts                # TypeScript types
+│   ├── index.html
 │   ├── package.json
 │   └── vite.config.ts
-├── docker-compose.yml              # Proof server
-├── package.json
+├── docker-compose.yml              # Proof server (v7.0.0)
+├── package.json                    # SDK 3.0 dependencies
 ├── tsconfig.json
 ├── .gitignore
 └── README.md
@@ -136,31 +193,18 @@ zkpass-lite/
 
 ---
 
-## Contract Explained
-
-The Compact contract (`contracts/zkpass.compact`) has:
-
-**Public ledger state** (visible on blockchain):
-- `accessCount: Counter` — how many successful checks have occurred
-- `lastStatus: Opaque<"string">` — the result string of the most recent check
-
-**Circuits** (callable functions):
-- `checkAccess(eligibilityToken)` — takes a **private** eligibility token, records "access-granted" on-chain, increments the counter. The token is never published.
-
----
-
 ## Commands Reference
 
-| Command                      | Description                          |
-| ---------------------------- | ------------------------------------ |
-| `npm run compile`            | Compile the Compact contract         |
-| `npm run deploy`             | Deploy contract to Preprod           |
-| `npm run cli`                | Interactive CLI for contract         |
-| `npm run check-balance`      | Check wallet tNight & DUST balance   |
-| `npm run proof-server:start` | Start the proof server (Docker)      |
-| `npm run proof-server:stop`  | Stop the proof server                |
-| `npm run setup`              | All-in-one: proof server + compile + deploy |
-| `npm run clean`              | Remove compiled artifacts            |
+| Command | Description |
+| --- | --- |
+| `npm run compile` | Compile the Compact contract to ZK circuits |
+| `npm run deploy` | Deploy contract to Preprod |
+| `npm run cli` | Interactive CLI (seed eligible set, check access, read state) |
+| `npm run check-balance` | Check wallet tNight & DUST balance |
+| `npm run proof-server:start` | Start proof server (Docker) |
+| `npm run proof-server:stop` | Stop proof server |
+| `npm run setup` | All-in-one: proof server + compile + deploy |
+| `npm run clean` | Remove compiled artifacts |
 
 ---
 
@@ -170,71 +214,80 @@ The Compact contract (`contracts/zkpass.compact`) has:
 ```
 Wallet.Proving: Failed to prove transaction
 ```
-→ Ensure Docker is running: `docker ps`
-→ Ensure proof server is started: `npm run proof-server:start`
-→ Verify port 6300 is available
+- Ensure Docker is running: `docker ps`
+- Start proof server: `npm run proof-server:start`
+- Verify port 6300 is free
 
 ### Not enough DUST
 ```
 Not enough Dust generated to pay the fee
 ```
-→ DUST is generated from tNight tokens over time
-→ Wait a few minutes, then re-run `npm run deploy` with "Restore from seed"
-→ Get more tNight: [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/)
+- DUST is generated from tNight tokens over time
+- Wait a few minutes, then re-run with "Restore from seed"
+- Get more tNight: [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/)
 
 ### Contract not compiled
-```
-Contract not compiled! Run: npm run compile
-```
-→ Verify the Compact compiler is installed: `compact --version`
-→ Run: `npm run compile`
+- Verify Compact compiler: `compact --version` (should be 0.19+)
+- Run: `npm run compile`
+
+### "Not eligible" assertion failure
+- Seed the eligible set first (CLI option [3])
+- Ensure you're using an exact match from the demo token list
+- The token is hashed — even one character difference produces a different commitment
 
 ### Lace wallet not detected (frontend)
-→ Install the [Midnight Lace wallet extension](https://docs.midnight.network/guides/lace-wallet)
-→ Or use Demo Mode (automatically activated when Lace is not present)
+- Install the [Midnight Lace wallet extension](https://docs.midnight.network/guides/lace-wallet)
+- Or use Demo Mode (activates automatically)
 
 ---
 
-## Environment Variables
+## Midnight Concepts Used
 
-This project uses Midnight Preprod network endpoints (hardcoded in `src/utils.ts`):
+This project demonstrates several core Midnight concepts from the [Midnight Agent Skills](https://github.com/mzf11125/midnight_agent_skills) knowledge base:
 
-| Variable       | Value                                                         |
-| -------------- | ------------------------------------------------------------- |
-| Indexer HTTP    | `https://indexer.preprod.midnight.network/api/v3/graphql`     |
-| Indexer WS      | `wss://indexer.preprod.midnight.network/api/v3/graphql/ws`    |
-| Node RPC        | `https://rpc.preprod.midnight.network`                        |
-| Proof Server    | `http://127.0.0.1:6300`                                      |
+| Concept | Skill Reference | How It's Used |
+| --- | --- | --- |
+| **Kachina dual-state model** | `midnight-concepts` | Public ledger + private witness |
+| **Selective disclosure** | `midnight-concepts` | Only hash and result disclosed, not raw token |
+| **Compact Set type** | `midnight-compact/ledger-operations` | `Set<Bytes<32>>` for eligible commitments |
+| **Witness functions** | `midnight-compact/typescript-interop` | `local_eligibility_token()` provides private data |
+| **`assert()` in circuits** | `midnight-compact/quick-start` | Fails proof generation if not eligible |
+| **`disclose()` operator** | `midnight-compact/ledger-operations` | Marks private values as safe for public storage |
+| **`persistent_hash()`** | `midnight-compact/standard-library` | Commitment scheme for token hashing |
+| **Constructor** | `midnight-compact/ledger-operations` | Initializes contract state at deploy |
+| **setNetworkId()** | `midnight-api/network-configuration` | Required before any SDK operation |
+| **DApp Connector API** | `midnight-api/dapp-connector-api` | Frontend wallet connection via Lace |
+| **Proof server** | `midnight-network/docker-deployment` | Docker container for ZK proof generation |
 
 ---
 
 ## 60-Second Demo Script (for Loom)
 
 1. **(0s)** "This is zkPass Lite — a privacy-preserving access checker built on Midnight."
-2. **(5s)** Show the frontend. "The idea is simple: prove you belong to an approved set without revealing personal data."
+2. **(5s)** Show the frontend. "The idea: prove you belong to an approved set without revealing personal data."
 3. **(10s)** Click Connect Wallet. "I connect my wallet. My identity stays shielded."
 4. **(15s)** Click Check Private Access. "Now I submit a private eligibility check."
-5. **(20s)** Show the loading state. "Under the hood, Midnight generates a zero-knowledge proof. My eligibility token never touches the blockchain."
-6. **(30s)** Show Access Granted. "Access granted. The only thing recorded on-chain is the result — not my token, not my identity."
-7. **(40s)** Show the unlocked content panel. "This could gate access to any protected resource — a community, a service, a document."
-8. **(45s)** "The privacy guarantee is built into the protocol. There's no trusted server, no database of identities."
+5. **(20s)** Show loading state. "A witness function reads my token locally. The Compact circuit hashes it and checks the hash against the on-chain set. A ZK proof verifies everything — my token never touches the blockchain."
+6. **(35s)** Show Access Granted. "Access granted. Only the result is on-chain."
+7. **(40s)** Show unlocked content. "This could gate any protected resource — a community, a service, a document."
+8. **(50s)** "The privacy guarantee is built into the protocol via the Kachina dual-state model. No trusted server. No database of identities."
 9. **(55s)** "zkPass Lite. Private access, proven on Midnight."
 
 ---
 
 ## Next 3 Improvements
 
-1. **Merkle commitment tree**: Replace the client-side allowlist with an on-chain Merkle root. Users prove membership against the root without revealing their position in the tree. This is the standard pattern for privacy-preserving set membership.
+1. **MerkleTree commitment scheme**: Replace `Set<Bytes<32>>` with `MerkleTree<32, Bytes<32>>` for O(log n) membership proofs. This is the standard pattern for large-scale privacy-preserving set membership, as documented in `midnight-compact/references/ledger-operations.md`.
 
-2. **Lace wallet full integration**: Wire the frontend to interact with the deployed contract through the DApp Connector API, so the entire flow runs on Preprod from the browser — connect wallet → generate proof → submit transaction → read result.
+2. **Full Lace wallet integration**: Wire the frontend to interact with the deployed contract through the DApp Connector API (`midnight-api/references/dapp-connector-api.md`), so the entire flow runs on Preprod from the browser.
 
-3. **Multi-claim support**: Extend the contract to support multiple binary claims (e.g., "is eligible for tier A", "is eligible for tier B") using separate ledger fields or a map structure, enabling richer access control policies.
+3. **Multi-claim access control**: Extend the contract with `Map<Bytes<32>, Set<Bytes<32>>>` to support multiple resource types with separate eligible sets, enabling richer access policies.
 
 ---
 
 ## Pitch for Fellowship Application
 
-zkPass Lite demonstrates Midnight's core value proposition: **privacy-preserving computation on a public blockchain.** It shows that sensitive eligibility data can remain private while access decisions are publicly verifiable. The project is intentionally minimal — one contract, one circuit, one claim — to focus on the fundamental pattern that all privacy-preserving applications build upon. It proves that zero-knowledge proofs are not just a theoretical concept but a practical building block for real-world access control, achievable by a solo builder using Midnight's toolchain.
+zkPass Lite demonstrates Midnight's core value proposition: **privacy-preserving computation on a public blockchain.** It uses the Kachina protocol's dual-state model — public ledger state for results, private witness state for sensitive data — bridged by zero-knowledge proofs. The project shows that sensitive eligibility data can remain private while access decisions are publicly verifiable. It proves that ZK-based access control is not just theoretical but practically buildable by a solo developer using Midnight's Compact language and SDK toolchain.
 
 ---
 

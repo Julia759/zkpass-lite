@@ -1,6 +1,12 @@
 // ─── zkPass Lite: CLI Interaction ───────────────────────────────────────────────
-// Interactive command-line interface to interact with the deployed zkPass contract.
-// Call the checkAccess circuit and read public state from the blockchain.
+// Interactive CLI to interact with the deployed zkPass contract on Preprod.
+//
+// This CLI demonstrates the Kachina dual-state model:
+//   PUBLIC STATE  → contract ledger (accessCount, lastStatus, eligibleCommitments)
+//   PRIVATE STATE → local witnesses (local_eligibility_token)
+//
+// The witness function provides the user's token locally during proof generation.
+// The token never leaves this machine — only its hash is checked on-chain.
 //
 // Usage: npm run cli
 
@@ -16,22 +22,10 @@ import {
   createProviders,
   compiledContract,
   ZkPass,
+  ELIGIBLE_TOKENS,
+  hashTokenToCommitment,
+  createWitnesses,
 } from './utils.js';
-
-// ─── Private Allowlist ─────────────────────────────────────────────────────────
-// In production, this would be a Merkle tree, a credential check, or an
-// on-chain commitment. For MVP, we use a simple local allowlist to demonstrate
-// the concept of private eligibility checking.
-const ELIGIBLE_TOKENS = new Set([
-  'midnight-pioneer',
-  'zkpass-member-001',
-  'fellowship-2024',
-  'demo-eligible',
-]);
-
-function isEligible(token: string): boolean {
-  return ELIGIBLE_TOKENS.has(token);
-}
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
@@ -89,45 +83,92 @@ async function main() {
       console.log('─────────────────────────────────────────────────────────────');
 
       const choice = await rl.question(
-        '  [1] Check private access\n  [2] Read access count\n  [3] Exit\n  > ',
+        '  [1] Check private access (prove eligibility)\n' +
+        '  [2] Add eligible commitment (admin)\n' +
+        '  [3] Seed eligible set with demo tokens (admin)\n' +
+        '  [4] Read public state\n' +
+        '  [5] Exit\n  > ',
       );
 
       switch (choice.trim()) {
+        // ─── Option 1: Check Access ────────────────────────────────────────
+        // Uses the witness function to provide the private token.
+        // The token stays local; only its hash is checked on-chain.
         case '1':
           try {
-            const token = await rl.question('\n  Enter your eligibility token: ');
+            const token = await rl.question('\n  Enter your eligibility token (private): ');
 
-            // Step 1: Check eligibility locally (private — never sent to chain)
-            if (!isEligible(token.trim())) {
-              console.log('\n  ❌ Access denied');
-              console.log('  This token could not prove eligibility.\n');
-              break;
-            }
+            // Show the user what will happen
+            const commitment = hashTokenToCommitment(token.trim());
+            console.log(`  Commitment (hash): ${Buffer.from(commitment).toString('hex').slice(0, 16)}…`);
+            console.log('  Your raw token stays private — only the hash is checked on-chain.\n');
 
-            // Step 2: Submit ZK proof to blockchain
-            console.log('  Checking eligibility (generating ZK proof, ~20-30 seconds)...\n');
+            console.log('  Generating ZK proof (~20-30 seconds)...\n');
+
+            // The witness provides the private token during proof generation.
+            // The proof server runs the circuit locally, the token never
+            // leaves this machine or appears in the transaction.
             const tx = await contract.callTx.checkAccess(token.trim());
 
             console.log('  ✅ Access granted!');
-            console.log('  You proved eligibility without exposing extra details.');
+            console.log('  You proved eligibility without exposing your token.');
             console.log(`  Transaction: ${tx.public.txId}`);
             console.log(`  Block: ${tx.public.blockHeight}\n`);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes('Not eligible') || msg.includes('assert')) {
+              console.log('\n  ❌ Access denied');
+              console.log('  This token is not in the eligible set.\n');
+            } else {
+              console.error(`  ❌ Error: ${msg}\n`);
+            }
+          }
+          break;
+
+        // ─── Option 2: Add Single Commitment ──────────────────────────────
+        // Admin adds hash(token) to the on-chain eligible set.
+        case '2':
+          try {
+            const rawToken = await rl.question('\n  Enter raw token to add: ');
+            const commitmentBytes = hashTokenToCommitment(rawToken.trim());
+            console.log(`  Adding commitment: ${Buffer.from(commitmentBytes).toString('hex').slice(0, 16)}…`);
+            console.log('  Submitting transaction...\n');
+
+            const tx = await contract.callTx.addEligible(commitmentBytes);
+            console.log(`  ✅ Commitment added! Tx: ${tx.public.txId}\n`);
           } catch (e) {
             console.error(`  ❌ Error: ${e instanceof Error ? e.message : e}\n`);
           }
           break;
 
-        case '2':
+        // ─── Option 3: Seed Demo Eligible Set ─────────────────────────────
+        // Adds all demo tokens' commitments to the contract.
+        case '3':
           try {
-            console.log('\n  Reading access count from blockchain...');
+            console.log('\n  Seeding eligible set with demo tokens...');
+            for (const token of ELIGIBLE_TOKENS) {
+              const commitmentBytes = hashTokenToCommitment(token);
+              console.log(`    Adding "${token}" → ${Buffer.from(commitmentBytes).toString('hex').slice(0, 16)}…`);
+              await contract.callTx.addEligible(commitmentBytes);
+            }
+            console.log('  ✅ All demo commitments added!\n');
+          } catch (e) {
+            console.error(`  ❌ Error: ${e instanceof Error ? e.message : e}\n`);
+          }
+          break;
+
+        // ─── Option 4: Read Public State ──────────────────────────────────
+        case '4':
+          try {
+            console.log('\n  Reading public state from blockchain...');
             const contractState = await providers.publicDataProvider.queryContractState(
               deployment.contractAddress,
             );
 
             if (contractState) {
               const ledgerState = ZkPass.ledger(contractState.data);
-              console.log(`  Total verified accesses: ${ledgerState.accessCount ?? 0}`);
-              console.log(`  Last status: "${ledgerState.lastStatus || '(none)'}"\n`);
+              console.log(`  Access count: ${ledgerState.accessCount ?? 0}`);
+              console.log(`  Last status:  "${ledgerState.lastStatus || '(none)'}"\n`);
             } else {
               console.log('  No state found.\n');
             }
@@ -136,7 +177,7 @@ async function main() {
           }
           break;
 
-        case '3':
+        case '5':
           running = false;
           break;
       }

@@ -1,57 +1,96 @@
 // zkPass Lite — Private Access Checker
-// A minimal Midnight contract that demonstrates privacy-preserving access control.
+// A minimal Midnight contract demonstrating privacy-preserving access control.
 //
-// How privacy works here:
-//   - Circuit inputs are ALWAYS private in Compact. They never appear on-chain.
-//   - When a user calls checkAccess(), they provide an eligibility token privately.
-//   - The Midnight proof server generates a Zero Knowledge proof of the computation.
-//   - Only the result (status message + counter increment) is published to the blockchain.
-//   - The eligibility token itself is never revealed to anyone.
+// ─── Architecture (Kachina Protocol) ─────────────────────────────────────────
+// Midnight uses the Kachina protocol's dual-state model:
+//   PUBLIC STATE  (ledger)  → on-chain, visible to all network participants
+//   PRIVATE STATE (witness) → local only, never leaves the user's machine
 //
-// Storage model:
-//   - accessCount (Counter): public on-chain count of successful access verifications
-//   - lastStatus (Opaque<"string">): public on-chain status message from the latest check
+// A zero-knowledge proof bridges the two: it proves a computation over private
+// data was performed correctly, without revealing that data.
 //
-// In production, you would replace the simple token check with:
-//   - A Merkle commitment tree (prove membership without revealing identity)
-//   - A hash comparison against a public commitment
-//   - Integration with a DID/credential system
+// ─── Privacy Model (Selective Disclosure) ────────────────────────────────────
+// In this contract:
+//   PRIVATE: The user's eligibility token (accessed via witness function)
+//   PUBLIC:  The commitment hash, the access result, and the access count
+//
+// The user's raw token is never published. Only its hash (commitment) is
+// disclosed for verification against the public eligible set. This is the
+// standard commitment scheme pattern in zero-knowledge systems.
+//
+// ─── Storage Model ───────────────────────────────────────────────────────────
+//   accessCount          Counter        — how many successful checks occurred
+//   lastStatus           Opaque<string> — human-readable result of latest check
+//   eligibleCommitments  Set<Bytes<32>> — hashed commitments of eligible tokens
 
-pragma language_version >= 0.20;
+pragma language_version >= 0.19;
 
 import CompactStandardLibrary;
 
-// ─── Public Ledger State ───────────────────────────────────────────────────────
-// These values are visible on the blockchain to anyone.
+// ─── Public Ledger State (on-chain, visible to all) ────────────────────────────
 
-// How many successful access checks have been recorded
+// Tracks total successful access verifications
 export ledger accessCount: Counter;
 
-// Human-readable result of the most recent access check
+// Human-readable status of the most recent check
 export ledger lastStatus: Opaque<"string">;
 
-// ─── Circuits (callable functions) ─────────────────────────────────────────────
-// Circuit inputs are private by default — they never appear on the blockchain.
-// The ZK proof proves the circuit executed correctly without revealing inputs.
+// Set of hashed commitments for eligible tokens.
+// Each entry is hash(raw_token). The raw tokens are never stored on-chain.
+export ledger eligibleCommitments: Set<Bytes<32>>;
 
-// checkAccess: Verify private eligibility and record the result on-chain.
+// ─── Witness Function (private, local only) ────────────────────────────────────
+// Witnesses provide private data from the user's local environment.
+// They execute on the user's machine during proof generation.
+// Their return values NEVER leave the user's device or appear on-chain.
+witness local_eligibility_token(): Bytes<32>;
+
+// ─── Constructor ───────────────────────────────────────────────────────────────
+// Called once at deployment. Initializes public ledger state.
+constructor() {
+  // Counter and Set start at their defaults (0 and empty).
+  // No explicit initialization needed for these types.
+}
+
+// ─── Circuit: addEligible ──────────────────────────────────────────────────────
+// Admin function: adds a hashed commitment to the eligible set.
 //
 // Parameters:
-//   eligibilityToken (Opaque<"string">) — the user's private proof of eligibility.
-//     This value is NEVER published to the blockchain. It stays on the user's machine
-//     and is only used during local proof generation.
+//   commitment (Bytes<32>) — the hash of an eligibility token.
+//     The admin computes hash(raw_token) off-chain and submits the hash.
+//     This means the raw token is never on-chain, even during setup.
 //
-// What happens on-chain:
-//   - lastStatus is updated to the disclosed result string
-//   - accessCount is incremented by 1
+// Public effect: inserts the commitment into eligibleCommitments set.
+export circuit addEligible(commitment: Bytes<32>): [] {
+  eligibleCommitments.insert(disclose(commitment));
+}
+
+// ─── Circuit: checkAccess ──────────────────────────────────────────────────────
+// User function: proves eligibility using a private token.
 //
-// What stays private:
-//   - The eligibilityToken value
-//   - The user's identity beyond their shielded address
-export circuit checkAccess(eligibilityToken: Opaque<"string">): [] {
-  // disclose() marks a value as safe to store in public ledger state.
-  // Here we disclose the RESULT ("access-granted"), not the token itself.
-  // The eligibilityToken remains private — only used for proof generation.
+// How it works:
+//   1. The witness function retrieves the user's private token locally
+//   2. The circuit hashes the token to produce a commitment
+//   3. The commitment is disclosed (made public) for set membership check
+//   4. assert() verifies the commitment exists in the eligible set
+//   5. If valid: status updated and counter incremented (on-chain)
+//   6. If invalid: proof generation fails, no transaction is submitted
+//
+// What stays PRIVATE: the raw eligibility token (via witness)
+// What becomes PUBLIC: the commitment hash, "access-granted" status, count
+export circuit checkAccess(): [] {
+  // Step 1: Get private token from local witness (never leaves user's device)
+  const token = local_eligibility_token();
+
+  // Step 2: Compute commitment hash (private computation inside the circuit)
+  const commitment = persistent_hash(token);
+
+  // Step 3-4: Disclose commitment and verify against eligible set
+  // disclose() marks the value as safe for public ledger comparison.
+  // The raw token remains private — only its hash is disclosed.
+  assert(eligibleCommitments.contains(disclose(commitment)), "Not eligible");
+
+  // Step 5: Record successful access on-chain
   lastStatus = disclose("access-granted");
   accessCount.increment(1);
 }

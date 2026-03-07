@@ -1,9 +1,16 @@
 // ─── Shared Utilities for zkPass Lite ──────────────────────────────────────────
 // Wallet creation, key derivation, provider setup, and contract loading.
-// Adapted from the official Midnight hello-world deploy tutorial.
+// Adapted from official Midnight deploy tutorial and aligned with midnight-api
+// integration patterns (setNetworkId, provider setup, witness implementation).
+//
+// Architecture note (Kachina Protocol):
+//   Midnight uses a dual-state model. Public state lives on-chain (ledger).
+//   Private state lives locally (witnesses + private state provider).
+//   ZK proofs bridge the two without revealing private data.
 
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
 import { WebSocket } from 'ws';
 import * as Rx from 'rxjs';
 import { Buffer } from 'buffer';
@@ -31,7 +38,8 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 // @ts-expect-error Midnight SDK needs global WebSocket
 globalThis.WebSocket = WebSocket;
 
-// Target network: Midnight Preprod
+// CRITICAL: setNetworkId() must be called before any SDK operations.
+// See midnight-api/references/network-configuration.md
 setNetworkId('preprod');
 
 // ─── Network Configuration ─────────────────────────────────────────────────────
@@ -53,6 +61,40 @@ export const compiledContract = CompiledContract.make('zkpass', ZkPass.Contract)
   CompiledContract.withVacantWitnesses,
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
+
+// ─── Eligible Tokens & Commitment Hashing ───────────────────────────────────────
+// The contract stores hashed commitments, not raw tokens. This mirrors the
+// Compact witness pattern: raw data stays private, only hashes go on-chain.
+//
+// Eligible tokens for the demo. In production, these would come from a
+// credential issuer, DID system, or admin API.
+export const ELIGIBLE_TOKENS = [
+  'midnight-pioneer',
+  'zkpass-member-001',
+  'fellowship-2024',
+  'demo-eligible',
+];
+
+// Hash a raw token to produce the commitment stored in the contract's Set.
+// This matches the persistent_hash() used inside the Compact circuit.
+export function hashTokenToCommitment(token: string): Uint8Array {
+  return createHash('sha256').update(token).digest();
+}
+
+// ─── Witness Implementation ─────────────────────────────────────────────────────
+// Witnesses are TypeScript functions that provide private data to Compact circuits.
+// They run locally during proof generation. Their return values never leave the
+// user's machine. See midnight-compact/references/typescript-interop.md.
+//
+// The witness signature must match the Compact declaration:
+//   witness local_eligibility_token(): Bytes<32>  →  () => Uint8Array
+export function createWitnesses(eligibilityToken: string) {
+  return {
+    local_eligibility_token: (): Uint8Array => {
+      return Buffer.from(eligibilityToken, 'utf-8').subarray(0, 32);
+    },
+  };
+}
 
 // ─── Key Derivation ────────────────────────────────────────────────────────────
 // Derives cryptographic keys from a 64-character hex seed.

@@ -1,18 +1,26 @@
 // ─── zkPass Lite: React Frontend ────────────────────────────────────────────────
 // Minimal demo UI for privacy-preserving access checking on Midnight.
 //
+// Architecture (Kachina Protocol dual-state model):
+//   PUBLIC STATE  → on-chain ledger (accessCount, lastStatus, eligibleCommitments)
+//   PRIVATE STATE → local witness (user's eligibility token, never sent anywhere)
+//
 // Two modes:
 //   1. Lace Wallet mode: connects to real Midnight Lace browser wallet
 //   2. Demo mode: simulates the flow locally (for presentations without Lace)
 //
-// The eligibility check uses a local private allowlist. In production, this
-// would be replaced by a Merkle proof or credential verification.
+// In production, the witness function provides the private token to the
+// Compact circuit, which hashes it and checks the hash against the on-chain
+// Set of eligible commitments. The raw token never leaves the user's device.
 
 import { useState, useCallback } from 'react';
 import type { AccessStatus, WalletState } from './types';
 import '@midnight-ntwrk/dapp-connector-api';
 
-// ─── Private Allowlist (client-side only, never sent to blockchain) ────────────
+// ─── Eligible Tokens (for demo simulation) ─────────────────────────────────────
+// In the real flow, these live as hashed commitments in the contract's
+// Set<Bytes<32>> on-chain. The raw tokens below are only used client-side
+// to simulate the witness function behavior in demo mode.
 const ELIGIBLE_TOKENS = new Set([
   'midnight-pioneer',
   'zkpass-member-001',
@@ -73,17 +81,22 @@ function App() {
   }, []);
 
   // ─── Access Check ────────────────────────────────────────────────────────
+  // In the real Midnight flow:
+  //   1. Witness function provides the private token locally
+  //   2. Compact circuit hashes it with persistent_hash()
+  //   3. Circuit checks hash against on-chain Set<Bytes<32>>
+  //   4. ZK proof is generated and submitted
+  //   5. Only the result appears on-chain; token stays private
+  //
+  // In demo mode, we simulate this with a local check and a delay
+  // representing proof generation time (~20-30s on real Preprod).
   const checkAccess = useCallback(async () => {
     setStatus('checking');
     setErrorMessage(null);
 
     try {
-      // Simulate ZK proof generation delay (real proofs take 20-30s)
       await new Promise((resolve) => setTimeout(resolve, isDemoMode ? 2000 : 3000));
 
-      // In production: submit to contract circuit, which generates a real ZK proof.
-      // For this demo: check against the local private allowlist.
-      // The privacy model is the same — the token never touches the blockchain.
       const demoToken = 'demo-eligible';
       const eligible = ELIGIBLE_TOKENS.has(demoToken);
 
@@ -215,14 +228,15 @@ function App() {
           </div>
         )}
 
-        {/* How It Works */}
+        {/* How It Works — explains the Kachina dual-state model to users */}
         {wallet.isConnected && status === 'idle' && (
           <div className="how-it-works">
             <h3>How it works</h3>
             <ol>
-              <li>Your eligibility token stays <strong>private</strong> — it never leaves your device.</li>
-              <li>A <strong>zero-knowledge proof</strong> verifies your claim without revealing the token.</li>
-              <li>Only the result (<em>"access granted"</em>) is recorded on the Midnight blockchain.</li>
+              <li>A <strong>witness function</strong> reads your eligibility token locally — it never leaves your device.</li>
+              <li>The Compact circuit <strong>hashes</strong> the token and checks it against the on-chain eligible set.</li>
+              <li>A <strong>zero-knowledge proof</strong> verifies the computation without revealing your token.</li>
+              <li>Only the result (<em>"access granted"</em>) is recorded on the Midnight ledger.</li>
             </ol>
           </div>
         )}
