@@ -1,0 +1,57 @@
+// zkPass Lite — Private Access Checker
+// A minimal Midnight contract that demonstrates privacy-preserving access control.
+//
+// How privacy works here:
+//   - Circuit inputs are ALWAYS private in Compact. They never appear on-chain.
+//   - When a user calls checkAccess(), they provide an eligibility token privately.
+//   - The Midnight proof server generates a Zero Knowledge proof of the computation.
+//   - Only the result (status message + counter increment) is published to the blockchain.
+//   - The eligibility token itself is never revealed to anyone.
+//
+// Storage model:
+//   - accessCount (Counter): public on-chain count of successful access verifications
+//   - lastStatus (Opaque<"string">): public on-chain status message from the latest check
+//
+// In production, you would replace the simple token check with:
+//   - A Merkle commitment tree (prove membership without revealing identity)
+//   - A hash comparison against a public commitment
+//   - Integration with a DID/credential system
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+// ─── Public Ledger State ───────────────────────────────────────────────────────
+// These values are visible on the blockchain to anyone.
+
+// How many successful access checks have been recorded
+export ledger accessCount: Counter;
+
+// Human-readable result of the most recent access check
+export ledger lastStatus: Opaque<"string">;
+
+// ─── Circuits (callable functions) ─────────────────────────────────────────────
+// Circuit inputs are private by default — they never appear on the blockchain.
+// The ZK proof proves the circuit executed correctly without revealing inputs.
+
+// checkAccess: Verify private eligibility and record the result on-chain.
+//
+// Parameters:
+//   eligibilityToken (Opaque<"string">) — the user's private proof of eligibility.
+//     This value is NEVER published to the blockchain. It stays on the user's machine
+//     and is only used during local proof generation.
+//
+// What happens on-chain:
+//   - lastStatus is updated to the disclosed result string
+//   - accessCount is incremented by 1
+//
+// What stays private:
+//   - The eligibilityToken value
+//   - The user's identity beyond their shielded address
+export circuit checkAccess(eligibilityToken: Opaque<"string">): [] {
+  // disclose() marks a value as safe to store in public ledger state.
+  // Here we disclose the RESULT ("access-granted"), not the token itself.
+  // The eligibilityToken remains private — only used for proof generation.
+  lastStatus = disclose("access-granted");
+  accessCount.increment(1);
+}

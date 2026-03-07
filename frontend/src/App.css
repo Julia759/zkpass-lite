@@ -1,0 +1,414 @@
+/* ─── zkPass Lite: Styles ─────────────────────────────────────────────────────── */
+/* Minimal, clean design optimized for demo readability. */
+
+:root {
+  --color-bg: #0a0a0f;
+  --color-surface: #13131a;
+  --color-surface-hover: #1a1a24;
+  --color-border: #2a2a3a;
+  --color-text: #e4e4ef;
+  --color-text-muted: #8888a0;
+  --color-primary: #6c5ce7;
+  --color-primary-hover: #7c6cf7;
+  --color-success: #00d2a0;
+  --color-success-bg: rgba(0, 210, 160, 0.08);
+  --color-success-border: rgba(0, 210, 160, 0.2);
+  --color-danger: #ff6b6b;
+  --color-danger-bg: rgba(255, 107, 107, 0.08);
+  --color-danger-border: rgba(255, 107, 107, 0.2);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.container {
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────────── */
+
+.header {
+  text-align: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.logo-icon {
+  font-size: 1.5rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.demo-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--color-primary);
+  border: 1px solid rgba(108, 92, 231, 0.3);
+  border-radius: 100px;
+}
+
+/* ─── Explainer ───────────────────────────────────────────────────────────────── */
+
+.explainer {
+  text-align: center;
+  padding: 1rem 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.explainer p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* ─── Wallet ──────────────────────────────────────────────────────────────────── */
+
+.wallet-section {
+  display: flex;
+  justify-content: center;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.wallet-address {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wallet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 6px rgba(0, 210, 160, 0.4);
+}
+
+.address-text {
+  font-size: 0.85rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--color-text-muted);
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: var(--font);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--color-primary);
+  color: white;
+  font-size: 1.05rem;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.btn-text {
+  background: none;
+  color: var(--color-text-muted);
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.btn-text:hover {
+  color: var(--color-text);
+}
+
+/* ─── Spinner ─────────────────────────────────────────────────────────────────── */
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Results ─────────────────────────────────────────────────────────────────── */
+
+.result {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.result-granted {
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+}
+
+.result-denied {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+
+.result-error {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+
+.result-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.result-granted .result-icon {
+  background: rgba(0, 210, 160, 0.15);
+  color: var(--color-success);
+}
+
+.result-denied .result-icon {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--color-danger);
+}
+
+.result-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.result-granted .result-title {
+  color: var(--color-success);
+}
+
+.result-denied .result-title {
+  color: var(--color-danger);
+}
+
+.result-text {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  max-width: 360px;
+}
+
+/* ─── Unlocked Content ────────────────────────────────────────────────────────── */
+
+.unlocked-content {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 1rem;
+  background: rgba(0, 210, 160, 0.05);
+  border: 1px dashed var(--color-success-border);
+  border-radius: var(--radius-sm);
+}
+
+.unlocked-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-success);
+  margin-bottom: 0.5rem;
+}
+
+.unlocked-icon {
+  font-size: 1rem;
+}
+
+.unlocked-text {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  text-align: left;
+}
+
+/* ─── How It Works ────────────────────────────────────────────────────────────── */
+
+.how-it-works {
+  padding: 1.25rem 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.how-it-works h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.how-it-works ol {
+  list-style: none;
+  counter-reset: steps;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.how-it-works li {
+  counter-increment: steps;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  padding-left: 1.75rem;
+  position: relative;
+}
+
+.how-it-works li::before {
+  content: counter(steps);
+  position: absolute;
+  left: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 0.1rem;
+}
+
+.how-it-works li strong {
+  color: var(--color-text);
+}
+
+.how-it-works li em {
+  color: var(--color-success);
+  font-style: normal;
+}
+
+/* ─── Footer ──────────────────────────────────────────────────────────────────── */
+
+.footer {
+  text-align: center;
+  padding-top: 1rem;
+}
+
+.footer p {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.footer a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}

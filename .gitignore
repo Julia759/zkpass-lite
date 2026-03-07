@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+contracts/managed/
+
+# Deployment state (contains wallet seed — never commit in production)
+deployment.json
+
+# Private state storage
+zkpass-state/
+hello-world-state/
+
+# System
+.DS_Store
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Frontend build
+frontend/dist/
