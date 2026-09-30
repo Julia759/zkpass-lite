@@ -11,6 +11,8 @@ The Compact contract keeps token commitments in a public set. A local witness su
 
 The token stays in the local witness. Its commitment, the access result, and the count are public. Because a public commitment can be matched against guessed tokens, use high-entropy tokens for any serious use.
 
+The [product note](PRODUCT_NOTE.md) explains the demo's scope, the tradeoffs, and the next user test.
+
 ## Run the contract and CLI
 
 You need Node.js 22+, Docker, and [Compact compiler 0.31.1](https://docs.midnight.network/getting-started/installation).
