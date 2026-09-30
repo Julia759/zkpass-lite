@@ -1,8 +1,8 @@
-# Midnight proof server — generates Zero Knowledge proofs for contract transactions.
+# Midnight proof server: generates Zero Knowledge proofs for contract transactions.
 # Required for deploying and interacting with contracts.
 services:
   proof-server:
-    image: midnightntwrk/proof-server:7.0.0
+    image: midnightntwrk/proof-server:8.1.0
     platform: linux/amd64
     environment:
       - PORT=6300
