@@ -1,6 +1,6 @@
 # zkPass Lite
 
-A small Midnight app for checking access without sharing an eligibility token.
+A small Midnight app for checking access without sharing an eligibility token. [Try the web demo](https://zkpass-lite.vercel.app/).
 
 The question behind it is simple: can someone prove they belong to an approved set while keeping their token on their own device? The Compact contract stores hashed commitments, checks membership in a circuit, and records successful access on the ledger.
 
