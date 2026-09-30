@@ -1,6 +1,6 @@
 # zkPass Lite
 
-Can someone prove they have an approved token without putting the token on-chain? This small Midnight app tries that flow. [Try the web demo](https://zkpass-lite.vercel.app/).
+Can a service confirm someone is allowed in without collecting their secret? Sharing only the answer leaves less sensitive data to expose if the service is breached. This small Midnight app explores that idea. [Try the web demo](https://zkpass-lite.vercel.app/).
 
 The Compact contract keeps token commitments in a public set. A local witness supplies a token, and the circuit checks its commitment. The CLI can deploy the contract, add commitments, and submit access checks on Midnight Preprod.
 
