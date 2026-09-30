@@ -44,7 +44,7 @@ function App() {
 
     try {
       if (!window.midnight?.mnLace) {
-        // Lace wallet not detected — offer demo mode
+        // Lace wallet not detected. Offer demo mode
         setIsDemoMode(true);
         setWallet({
           isConnected: true,
@@ -228,12 +228,12 @@ function App() {
           </div>
         )}
 
-        {/* How It Works — explains the Kachina dual-state model to users */}
+        {/* How It Works: explains the Kachina dual-state model to users */}
         {wallet.isConnected && status === 'idle' && (
           <div className="how-it-works">
             <h3>How it works</h3>
             <ol>
-              <li>A <strong>witness function</strong> reads your eligibility token locally — it never leaves your device.</li>
+              <li>A <strong>witness function</strong> reads your eligibility token locally. It never leaves your device.</li>
               <li>The Compact circuit <strong>hashes</strong> the token and checks it against the on-chain eligible set.</li>
               <li>A <strong>zero-knowledge proof</strong> verifies the computation without revealing your token.</li>
               <li>Only the result (<em>"access granted"</em>) is recorded on the Midnight ledger.</li>
@@ -248,7 +248,7 @@ function App() {
             <a href="https://midnight.network" target="_blank" rel="noopener noreferrer">
               Midnight Network
             </a>
-            {' '}— privacy-preserving smart contracts powered by zero-knowledge proofs.
+            {' '}• privacy-preserving smart contracts powered by zero-knowledge proofs.
           </p>
         </footer>
       </div>
