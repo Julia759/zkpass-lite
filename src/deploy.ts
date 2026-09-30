@@ -17,19 +17,21 @@ import { Buffer } from 'buffer';
 
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { toHex } from '@midnight-ntwrk/midnight-js-utils';
-import { unshieldedToken } from '@midnight-ntwrk/ledger-v7';
-import { generateRandomSeed } from '@midnight-ntwrk/wallet-sdk-hd';
+import { getNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { generateRandomSeed, DustAddress, MidnightBech32m } from '@midnightntwrk/wallet-sdk';
 
 import {
   createWallet,
   createProviders,
-  compiledContract,
+  createCompiledContract,
   zkConfigPath,
 } from './utils.js';
+import { adminCommitmentFromSeed, adminSecretFromSeed } from './eligibility.js';
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║         zkPass Lite — Deploy to Midnight Preprod            ║');
+  console.log('║         zkPass Lite: Deploy to Midnight Preprod            ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
   // Verify contract is compiled
@@ -76,7 +78,7 @@ async function main() {
     // ─── Step 2: Fund Wallet ─────────────────────────────────────────────────
     if (balance === 0n) {
       console.log('─── Step 2: Fund Your Wallet ───────────────────────────────────\n');
-      console.log('  Visit: https://faucet.preprod.midnight.network/');
+      console.log('  Visit: https://midnight-tmnight-preprod.nethermind.dev/');
       console.log(`  Address: ${address}\n`);
       console.log('  Waiting for funds...');
 
@@ -98,17 +100,20 @@ async function main() {
       walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)),
     );
 
-    if (dustState.dust.walletBalance(new Date()) === 0n) {
+    if (dustState.dust.balance(new Date()) === 0n) {
       const nightUtxos = dustState.unshielded.availableCoins.filter(
         (c: any) => !c.meta?.registeredForDustGeneration,
       );
 
       if (nightUtxos.length > 0) {
         console.log('  Registering for DUST generation...');
+        const dustAddress = String(DustAddress.encodePublicKey(getNetworkId(), dustState.dust.publicKey));
+        const dustReceiver = MidnightBech32m.parse(dustAddress).decode(DustAddress, getNetworkId());
         const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
           nightUtxos,
           walletCtx.unshieldedKeystore.getPublicKey(),
           (payload) => walletCtx.unshieldedKeystore.signData(payload),
+          dustReceiver,
         );
         await walletCtx.wallet.submitTransaction(
           await walletCtx.wallet.finalizeRecipe(recipe),
@@ -120,7 +125,7 @@ async function main() {
         walletCtx.wallet.state().pipe(
           Rx.throttleTime(5000),
           Rx.filter((s) => s.isSynced),
-          Rx.filter((s) => s.dust.walletBalance(new Date()) > 0n),
+          Rx.filter((s) => s.dust.balance(new Date()) > 0n),
         ),
       );
     }
@@ -133,7 +138,10 @@ async function main() {
 
     console.log('  Deploying contract (this may take 30-60 seconds)...\n');
     const deployed = await deployContract(providers, {
-      compiledContract,
+      compiledContract: createCompiledContract(() => {
+        throw new Error('Eligibility token is only available when checking access');
+      }, () => adminSecretFromSeed(seed.trim())),
+      args: [adminCommitmentFromSeed(seed.trim())],
       privateStateId: 'zkpassState',
       initialPrivateState: {},
     });
@@ -146,7 +154,6 @@ async function main() {
     // ─── Step 5: Save Deployment Info ───────────────────────────────────────
     const deploymentInfo = {
       contractAddress,
-      seed,
       network: 'preprod',
       deployedAt: new Date().toISOString(),
     };
@@ -158,8 +165,8 @@ async function main() {
 
     console.log('─── Deployment Complete! ───────────────────────────────────────\n');
     console.log('  Next steps:');
-    console.log('  1. npm run cli     — interact with the contract');
-    console.log('  2. cd frontend && npm run dev — start the web UI\n');
+    console.log('  1. npm run cli    : interact with the contract');
+    console.log('  2. cd frontend && npm run dev: start the web UI\n');
   } finally {
     rl.close();
   }

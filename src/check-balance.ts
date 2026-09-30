@@ -5,12 +5,12 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import * as Rx from 'rxjs';
-import { unshieldedToken } from '@midnight-ntwrk/ledger-v7';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 
 import { createWallet } from './utils.js';
 
 async function main() {
-  console.log('\n  zkPass Lite — Balance Checker\n');
+  console.log('\n  zkPass Lite: Balance Checker\n');
 
   const rl = createInterface({ input: stdin, output: stdout });
 
@@ -30,7 +30,7 @@ async function main() {
 
     const address = walletCtx.unshieldedKeystore.getBech32Address();
     const tNight = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
-    const dust = state.dust.walletBalance(new Date());
+    const dust = state.dust.balance(new Date());
 
     console.log(`\n  Address: ${address}`);
     console.log(`  tNight:  ${tNight.toLocaleString()}`);

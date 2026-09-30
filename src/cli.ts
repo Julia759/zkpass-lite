@@ -6,7 +6,7 @@
 //   PRIVATE STATE → local witnesses (local_eligibility_token)
 //
 // The witness function provides the user's token locally during proof generation.
-// The token never leaves this machine — only its hash is checked on-chain.
+// The token never leaves this machine: only its hash is checked on-chain.
 //
 // Usage: npm run cli
 
@@ -20,16 +20,15 @@ import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import {
   createWallet,
   createProviders,
-  compiledContract,
+  createCompiledContract,
   ZkPass,
   ELIGIBLE_TOKENS,
-  hashTokenToCommitment,
-  createWitnesses,
 } from './utils.js';
+import { adminSecretFromSeed, hashTokenToCommitment, tokenToBytes } from './eligibility.js';
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║         zkPass Lite — Private Access Checker CLI            ║');
+  console.log('║         zkPass Lite: Private Access Checker CLI            ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
   if (!fs.existsSync('deployment.json')) {
@@ -60,9 +59,14 @@ async function main() {
     const providers = await createProviders(walletCtx);
 
     console.log('  Joining contract...');
+    let activeToken: Uint8Array | undefined;
+    const adminSecret = adminSecretFromSeed(seed.trim());
     const contract = await findDeployedContract(providers, {
       contractAddress: deployment.contractAddress,
-      compiledContract,
+      compiledContract: createCompiledContract(() => {
+        if (!activeToken) throw new Error('Enter an eligibility token before checking access');
+        return activeToken;
+      }, () => adminSecret),
       privateStateId: 'zkpassState',
       initialPrivateState: {},
     });
@@ -76,7 +80,7 @@ async function main() {
         await Rx.firstValueFrom(
           walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)),
         )
-      ).dust.walletBalance(new Date());
+      ).dust.balance(new Date());
 
       console.log('─────────────────────────────────────────────────────────────');
       console.log(`  DUST: ${dust.toLocaleString()}`);
@@ -99,16 +103,24 @@ async function main() {
             const token = await rl.question('\n  Enter your eligibility token (private): ');
 
             // Show the user what will happen
-            const commitment = hashTokenToCommitment(token.trim());
+            const tokenBytes = tokenToBytes(token);
+            const commitment = hashTokenToCommitment(token);
             console.log(`  Commitment (hash): ${Buffer.from(commitment).toString('hex').slice(0, 16)}…`);
-            console.log('  Your raw token stays private — only the hash is checked on-chain.\n');
+            console.log('  Your raw token stays private: only the hash is checked on-chain.\n');
 
             console.log('  Generating ZK proof (~20-30 seconds)...\n');
 
             // The witness provides the private token during proof generation.
             // The proof server runs the circuit locally, the token never
             // leaves this machine or appears in the transaction.
-            const tx = await contract.callTx.checkAccess(token.trim());
+            activeToken = tokenBytes;
+            let tx;
+            try {
+              tx = await contract.callTx.checkAccess();
+            } finally {
+              tokenBytes.fill(0);
+              activeToken = undefined;
+            }
 
             console.log('  ✅ Access granted!');
             console.log('  You proved eligibility without exposing your token.');
@@ -168,7 +180,9 @@ async function main() {
             if (contractState) {
               const ledgerState = ZkPass.ledger(contractState.data);
               console.log(`  Access count: ${ledgerState.accessCount ?? 0}`);
-              console.log(`  Last status:  "${ledgerState.lastStatus || '(none)'}"\n`);
+              const lastStatus = Buffer.from(ledgerState.lastStatus)
+                .toString('utf8').replace(/\0/g, '');
+              console.log(`  Last status:  "${lastStatus || '(none)'}"\n`);
             } else {
               console.log('  No state found.\n');
             }
