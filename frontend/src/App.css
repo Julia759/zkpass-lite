@@ -117,6 +117,10 @@ body {
   color: var(--color-text-muted);
 }
 
+.explainer p + p {
+  margin-top: 0.75rem;
+}
+
 /* ─── Wallet ──────────────────────────────────────────────────────────────────── */
 
 .wallet-section {

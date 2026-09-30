@@ -45,7 +45,7 @@ function App() {
 
   const checkAccess = useCallback(() => {
     if (!token.trim()) {
-      setErrorMessage('Enter a demo token to try the local check.');
+      setErrorMessage('Enter a sample access code to try the local check.');
       setStatus('error');
       return;
     }
@@ -73,8 +73,12 @@ function App() {
 
         <div className="explainer">
           <p>
-            This page shows the access flow with a local token list. It does not generate a proof,
-            submit a transaction, or protect content. The contract and CLI contain the proof flow.
+            A service needs to know if you qualify, not keep your secret access code. Sharing less
+            data means there is less to expose if that service is breached.
+          </p>
+          <p>
+            This page checks a sample code in your browser. It does not generate a proof, submit a
+            transaction, or protect content. The contract and CLI contain the real proof flow.
           </p>
         </div>
 
@@ -112,13 +116,13 @@ function App() {
 
         {wallet.isConnected && status !== 'granted' && status !== 'denied' && (
           <div className="check-form">
-            <label htmlFor="demo-token">Demo token</label>
+            <label htmlFor="demo-token">Sample access code</label>
             <input
               id="demo-token"
               type="text"
               value={token}
               onChange={(event) => setToken(event.target.value)}
-              placeholder="Try demo-eligible"
+              placeholder="Type demo-eligible"
               autoComplete="off"
             />
             <button className="btn btn-primary" onClick={checkAccess}>
@@ -132,7 +136,7 @@ function App() {
             <div className="result-icon">✓</div>
             <h2 className="result-title">Demo access granted</h2>
             <p className="result-text">
-              This token matches the page's local demo list. No zero knowledge proof was generated.
+              This sample code matches the page's local demo list. No zero knowledge proof was generated.
             </p>
             <button className="btn btn-secondary" onClick={resetStatus}>Check again</button>
           </div>
@@ -142,7 +146,7 @@ function App() {
           <div className="result result-denied">
             <div className="result-icon">✗</div>
             <h2 className="result-title">Demo access denied</h2>
-            <p className="result-text">This token is not in the page's local demo list.</p>
+            <p className="result-text">This sample code is not in the page's local demo list.</p>
             <button className="btn btn-secondary" onClick={resetStatus}>Try again</button>
           </div>
         )}
