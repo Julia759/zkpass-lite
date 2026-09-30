@@ -1,4 +1,4 @@
-// zkPass Lite — Private Access Checker
+// zkPass Lite: Private Access Checker
 // A minimal Midnight contract demonstrating privacy-preserving access control.
 //
 // ─── Architecture (Kachina Protocol) ─────────────────────────────────────────
@@ -19,9 +19,10 @@
 // standard commitment scheme pattern in zero-knowledge systems.
 //
 // ─── Storage Model ───────────────────────────────────────────────────────────
-//   accessCount          Counter        — how many successful checks occurred
-//   lastStatus           Opaque<string> — human-readable result of latest check
-//   eligibleCommitments  Set<Bytes<32>> — hashed commitments of eligible tokens
+//   accessCount          Counter       : how many successful checks occurred
+//   lastStatus           Bytes<14>: result of latest check
+//   eligibleCommitments  Set<Bytes<32>>: hashed commitments of eligible tokens
+//   adminCommitment      Bytes<32>     : commitment to the deployer's admin secret
 
 pragma language_version >= 0.19;
 
@@ -33,35 +34,38 @@ import CompactStandardLibrary;
 export ledger accessCount: Counter;
 
 // Human-readable status of the most recent check
-export ledger lastStatus: Opaque<"string">;
+export ledger lastStatus: Bytes<14>;
 
 // Set of hashed commitments for eligible tokens.
 // Each entry is hash(raw_token). The raw tokens are never stored on-chain.
 export ledger eligibleCommitments: Set<Bytes<32>>;
+export ledger adminCommitment: Bytes<32>;
 
 // ─── Witness Function (private, local only) ────────────────────────────────────
 // Witnesses provide private data from the user's local environment.
 // They execute on the user's machine during proof generation.
 // Their return values NEVER leave the user's device or appear on-chain.
 witness local_eligibility_token(): Bytes<32>;
+witness local_admin_secret(): Bytes<32>;
 
 // ─── Constructor ───────────────────────────────────────────────────────────────
 // Called once at deployment. Initializes public ledger state.
-constructor() {
+constructor(adminCommitment_: Bytes<32>) {
   // Counter and Set start at their defaults (0 and empty).
-  // No explicit initialization needed for these types.
+  adminCommitment = disclose(adminCommitment_);
 }
 
 // ─── Circuit: addEligible ──────────────────────────────────────────────────────
 // Admin function: adds a hashed commitment to the eligible set.
 //
 // Parameters:
-//   commitment (Bytes<32>) — the hash of an eligibility token.
+//   commitment (Bytes<32>): the hash of an eligibility token.
 //     The admin computes hash(raw_token) off-chain and submits the hash.
 //     This means the raw token is never on-chain, even during setup.
 //
 // Public effect: inserts the commitment into eligibleCommitments set.
 export circuit addEligible(commitment: Bytes<32>): [] {
+  assert(persistentHash<Bytes<32>>(local_admin_secret()) == adminCommitment, "Only admin can add eligible tokens");
   eligibleCommitments.insert(disclose(commitment));
 }
 
@@ -83,12 +87,12 @@ export circuit checkAccess(): [] {
   const token = local_eligibility_token();
 
   // Step 2: Compute commitment hash (private computation inside the circuit)
-  const commitment = persistent_hash(token);
+  const commitment = persistentHash<Bytes<32>>(token);
 
   // Step 3-4: Disclose commitment and verify against eligible set
   // disclose() marks the value as safe for public ledger comparison.
-  // The raw token remains private — only its hash is disclosed.
-  assert(eligibleCommitments.contains(disclose(commitment)), "Not eligible");
+  // The raw token remains private: only its hash is disclosed.
+  assert(eligibleCommitments.member(disclose(commitment)), "Not eligible");
 
   // Step 5: Record successful access on-chain
   lastStatus = disclose("access-granted");
