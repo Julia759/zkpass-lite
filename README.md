@@ -8,7 +8,7 @@ Built on [Midnight Network](https://midnight.network) using Compact smart contra
 
 ## What It Does
 
-zkPass Lite is a private eligibility checker. A user connects a wallet, submits a proof for one binary claim (eligible / not eligible), and receives an access decision — all without exposing their private eligibility token.
+zkPass Lite is a private eligibility checker. A user connects a wallet, submits a proof for one binary claim (eligible / not eligible), and receives an access decision, all without exposing their private eligibility token.
 
 ### Architecture: Kachina Dual-State Model
 
