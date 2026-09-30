@@ -1,4 +1,4 @@
-# zkPass Lite — Private Access Checker
+# zkPass Lite Private Access Checker
 
 > A minimal Midnight app that demonstrates privacy-preserving access control. Users prove eligibility for protected access without revealing unnecessary personal information.
 
