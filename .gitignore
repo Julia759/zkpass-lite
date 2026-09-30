@@ -5,7 +5,7 @@ node_modules/
 dist/
 contracts/managed/
 
-# Deployment state (contains wallet seed — never commit in production)
+# Deployment state (local network configuration)
 deployment.json
 
 # Private state storage
