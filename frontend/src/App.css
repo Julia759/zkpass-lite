@@ -213,6 +213,32 @@ body {
   color: var(--color-text);
 }
 
+.check-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.check-form label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.check-form input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.check-form input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ─── Spinner ─────────────────────────────────────────────────────────────────── */
 
 .spinner {
